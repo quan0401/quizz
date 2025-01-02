@@ -1,32 +1,78 @@
 import React, { useState, useEffect } from "react";
 import { Card, Radio, Button, Tag, message } from "antd";
 import * as XLSX from "xlsx";
+import axios from "axios";
 
 const Quiz: React.FC = () => {
-  const dummyData = [
-    {
-      question: "What is the title of the budget document presented to the House of Commons by Finance Minister Chrystia Freeland on March 28, 2023?",
-      correct_answer: "2023 Canadian federal budget",
-      incorrect_answers: ["2023 Canadian Economic Action Plan", "2023-2024 Fiscal Year Report", "Budget of the Canadian Federal Government 2023"],
-    },
-    {
-      question: "What is the fiscal year covered by the 2023 Canadian federal budget?",
-      correct_answer: "April 1, 2023 - March 31, 2024",
-      incorrect_answers: ["April 1, 2022 - March 31, 2023", "January 1, 2023 - December 31, 2023", "July 1, 2023 - June 30, 2024"],
-    },
-  ];
-
   const [quizData, setQuizData] = useState<any[]>([]);
   const [userAnswers, setUserAnswers] = useState<{ [key: number]: string }>({});
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [scorePercent, setScorePercent] = useState<number | null>(null);
 
   useEffect(() => {
-    const shuffledData = dummyData.map((item) => ({
-      ...item,
-      options: [item.correct_answer, ...item.incorrect_answers].sort(() => Math.random() - 0.5),
-    }));
-    setQuizData(shuffledData);
+    // Fetch quiz data from the API
+    const fetchQuizData = async () => {
+      try {
+        const response = await axios.post("/api/faq/create_and_save_faq/", {
+          knowledge_scope: "",
+          num_questions: 5,
+        });
+
+        if (response.data.status === "success" && response.data.faqs) {
+          const faqs = response.data.faqs.map((faq: any) => ({
+            question: faq.question,
+            correct_answer: faq.right_answer,
+            incorrect_answers: [
+              faq.wrong_answer_1,
+              faq.wrong_answer_2,
+              faq.wrong_answer_3,
+            ],
+          }));
+
+          const shuffledData = faqs.map((item: any) => ({
+            ...item,
+            options: [item.correct_answer, ...item.incorrect_answers].sort(() => Math.random() - 0.5),
+          }));
+          setQuizData(shuffledData);
+        } else {
+          message.error("Failed to load quiz data. Loading default questions.");
+          setQuizData(loadDefaultQuestions());
+        }
+      } catch (error) {
+        console.error(error);
+        message.error("An error occurred while fetching quiz data. Loading default questions.");
+        setQuizData(loadDefaultQuestions());
+      }
+    };
+
+    const loadDefaultQuestions = () => {
+      const defaultQuestions = [
+        // Default questions as provided
+        {
+          question: "Hiệp định sơ bộ được ký kết giữa chính phủ Việt Nam và Pháp vào ngày tháng năm nào?",
+          correct_answer: "06/3/1946",
+          incorrect_answers: ["14/9/1946", "26/11/1953", "21/7/1954"],
+        },
+        {
+          question: "Hội nghị Giơnevơ được triệu tập để giải quyết vấn đề nào?",
+          correct_answer: "Triều Tiên và lập lại hòa bình ở Đông Dương",
+          incorrect_answers: [
+            "Chấm dứt chiến tranh ở Việt Nam",
+            "Thống nhất đất nước Việt Nam",
+            "Giải quyết xung đột giữa các nước lớn",
+          ],
+        },
+        // Additional questions...
+      ];
+
+      return defaultQuestions.map((item) => ({
+        ...item,
+        options: [item.correct_answer, ...item.incorrect_answers].sort(() => Math.random() - 0.5),
+      }));
+    };
+
+
+    fetchQuizData();
   }, []);
 
   const handleAnswerChange = (questionIndex: number, value: string) => {
@@ -72,14 +118,14 @@ const Quiz: React.FC = () => {
     }
 
     const exportData = quizData.map((item, index) => ({
-      "STT": index + 1,
+      "STT": (index + 1).toString(),
       "Nội dung câu hỏi": item.question,
       "Đáp án đã chọn": userAnswers[index] || "Chưa trả lời",
       "Kết quả": userAnswers[index] === item.correct_answer ? "Đúng" : "Sai",
     }));
 
     exportData.push({
-      "STT": "Tổng kết",
+      "STT": "Summary",
       "Nội dung câu hỏi": "",
       "Đáp án đã chọn": "",
       "Kết quả": `Điểm số: ${scorePercent}%`,
